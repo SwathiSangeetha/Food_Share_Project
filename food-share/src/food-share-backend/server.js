@@ -19,25 +19,39 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ---------------- STATIC FILES ----------------
-
-// Local development only.
-// Use cloud storage for permanent uploaded certificates in production.
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(
+    path.join(__dirname, "uploads")
+));
 
 // ---------------- MONGODB CONNECTION ----------------
 
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("MongoDB connected successfully"))
-    .catch(err => console.error("MongoDB connection error:", err));
+async function connectDB() {
+    if (!process.env.MONGO_URI) {
+        throw new Error("MONGO_URI environment variable is missing");
+    }
 
-// ---------------- ROUTES ----------------
+    if (mongoose.connection.readyState === 1) {
+        return;
+    }
 
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/receivers", require("./routes/receivers"));
-app.use("/api/donations", require("./routes/donations"));
-app.use("/api/needposts", require("./routes/needPosts"));
-app.use("/api/certificates", require("./routes/certificates"));
+    if (!global.mongooseCache) {
+        global.mongooseCache = {
+            promise: null
+        };
+    }
+
+    if (!global.mongooseCache.promise) {
+        global.mongooseCache.promise = mongoose.connect(
+            process.env.MONGO_URI,
+            { serverSelectionTimeoutMS: 10000 }
+        ).catch(error => {
+            global.mongooseCache.promise = null;
+            throw error;
+        });
+    }
+
+    await global.mongooseCache.promise;
+}
 
 // ---------------- HEALTH CHECK ----------------
 
@@ -48,15 +62,49 @@ app.get("/", (req, res) => {
     });
 });
 
-app.get("/api/health", (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: "Backend is healthy",
-        database: mongoose.connection.readyState === 1
-            ? "Connected"
-            : "Disconnected"
-    });
+app.get("/api/health", async (req, res) => {
+    try {
+        await connectDB();
+
+        res.status(200).json({
+            success: true,
+            message: "Backend is healthy",
+            database: "Connected"
+        });
+    } catch (error) {
+        console.error("MongoDB connection error:", error.message);
+
+        res.status(503).json({
+            success: false,
+            message: "MongoDB connection failed",
+            database: "Disconnected"
+        });
+    }
 });
+
+// ---------------- DATABASE MIDDLEWARE ----------------
+
+app.use(async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (error) {
+        console.error("Database error:", error.message);
+
+        res.status(503).json({
+            success: false,
+            message: "Database connection unavailable"
+        });
+    }
+});
+
+// ---------------- ROUTES ----------------
+
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/receivers", require("./routes/receivers"));
+app.use("/api/donations", require("./routes/donations"));
+app.use("/api/needposts", require("./routes/needPosts"));
+app.use("/api/certificates", require("./routes/certificates"));
 
 // ---------------- ERROR HANDLER ----------------
 
@@ -69,9 +117,8 @@ app.use((err, req, res, next) => {
     });
 });
 
-// ---------------- EXPORT / LOCAL SERVER ----------------
+// ---------------- EXPORT ----------------
 
-// Vercel uses the exported Express application.
 module.exports = app;
 
 // Local development
