@@ -495,12 +495,27 @@ async function seed() {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ Connected to MongoDB");
+const result = await Receiver.bulkWrite(
+  receivers.map(receiver => ({
+    updateOne: {
+      filter: {
+        name: receiver.name,
+        city: receiver.city
+      },
+      update: {
+        $setOnInsert: receiver
+      },
+      upsert: true
+    }
+  }))
+);
 
-    await Receiver.deleteMany({});
-    console.log("🗑️  Cleared existing receivers\n");
+console.log(`Inserted: ${result.upsertedCount}`);
+console.log(`Already existed: ${result.matchedCount}`);
 
-    const inserted = await Receiver.insertMany(receivers);
-    console.log(`✅ Inserted ${inserted.length} REAL receivers:\n`);
+const inserted = await Receiver.find({
+  city: { $in: ["Kanchipuram", "Sriperumbudur"] }
+});
 
     const byCity = {};
     inserted.forEach(r => {
