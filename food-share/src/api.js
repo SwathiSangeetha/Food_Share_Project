@@ -1,6 +1,10 @@
+
 // ── Backend URL ───────────────────────────────────────────────
-// Change this if you deploy the backend
-export const API_BASE = "http://localhost:5000/api";
+const BACKEND_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+).replace(/\/+$/, "");
+
+export const API_BASE = `${BACKEND_URL}/api`;
 
 // ── Auth ──────────────────────────────────────────────────────
 export async function registerUser(data) {
@@ -22,11 +26,19 @@ export async function loginUser(email, password) {
 }
 
 // ── ML: Fetch nearby receivers from MongoDB ───────────────────
-// Sends lat/lng + food details → backend runs ML scoring on DB
-export async function fetchNearbyReceivers({ lat, lng, qty, foodType, city }) {
-  const params = new URLSearchParams({ lat, lng, qty, foodType });
+export async function fetchNearbyReceivers({
+  lat, lng, qty, foodType, city
+}) {
+  const params = new URLSearchParams({
+    lat, lng, qty, foodType
+  });
+
   if (city) params.append("city", city);
-  const res = await fetch(`${API_BASE}/receivers/nearby?${params}`);
+
+  const res = await fetch(
+    `${API_BASE}/receivers/nearby?${params}`
+  );
+
   const data = await res.json();
   return data.receivers || [];
 }
@@ -59,19 +71,37 @@ export async function postNeed(data) {
 
 // ── NGO Certificate AI Analysis & Admin Review ────────────────
 export async function uploadAndAnalyzeCertificate(formData) {
-  const res = await fetch(`${API_BASE}/certificates/upload-and-analyze`, {
-    method: "POST",
-    body: formData, // multipart/form-data (browser sets boundary automatically)
-  });
+  const res = await fetch(
+    `${API_BASE}/certificates/upload-and-analyze`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
   return res.json();
 }
 
-export async function fetchCertificates({ status = "all", search = "", certType = "all" } = {}) {
+export async function fetchCertificates({
+  status = "all",
+  search = "",
+  certType = "all"
+} = {}) {
   const params = new URLSearchParams();
-  if (status && status !== "all") params.append("status", status);
+
+  if (status && status !== "all") {
+    params.append("status", status);
+  }
+
   if (search) params.append("search", search);
-  if (certType && certType !== "all") params.append("certType", certType);
-  const res = await fetch(`${API_BASE}/certificates?${params}`);
+
+  if (certType && certType !== "all") {
+    params.append("certType", certType);
+  }
+
+  const res = await fetch(
+    `${API_BASE}/certificates?${params}`
+  );
+
   return res.json();
 }
 
@@ -80,18 +110,33 @@ export async function fetchCertificateById(id) {
   return res.json();
 }
 
-export async function updateCertificateStatus(id, { status, adminNotes, reviewedBy }) {
-  const res = await fetch(`${API_BASE}/certificates/${id}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status, adminNotes, reviewedBy }),
-  });
+export async function updateCertificateStatus(
+  id,
+  { status, adminNotes, reviewedBy }
+) {
+  const res = await fetch(
+    `${API_BASE}/certificates/${id}/status`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status,
+        adminNotes,
+        reviewedBy
+      }),
+    }
+  );
+
   return res.json();
 }
 
 export async function deleteCertificate(id) {
-  const res = await fetch(`${API_BASE}/certificates/${id}`, {
-    method: "DELETE",
-  });
+  const res = await fetch(
+    `${API_BASE}/certificates/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
+
   return res.json();
 }
